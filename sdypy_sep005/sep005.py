@@ -5,7 +5,7 @@ from datetime import datetime
 COMPULSORY_FIELDS = ['data','name','unit_str']
 PROHIBITED_FIELDS = ['timestamp']
 
-def assert_sep005(timeseries:list):
+def assert_sep005(timeseries):
     """
     Assert the compliance with the SEP005 guidelines as specified in
     https://github.com/sdypy/sdypy/blob/main/docs/seps/sep-0005.rst
@@ -13,8 +13,11 @@ def assert_sep005(timeseries:list):
     """
 
     # Check datatype
-    if type(timeseries) != list:
-        raise TypeError(f'Invalid datatype {type(timeseries)}, should be list')
+    if type(timeseries) != list and type(timeseries) != dict:
+        raise TypeError(f'Invalid datatype {type(timeseries)}, should be list or dict')
+
+    if type(timeseries) == dict:
+        timeseries = [timeseries]
 
     # Check the individual channels
     for channel in timeseries:

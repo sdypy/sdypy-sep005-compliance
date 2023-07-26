@@ -73,7 +73,7 @@ def test_assert_sep005():
 
     # Type errors
     with pytest.raises(TypeError):
-        assert_sep005({'dummy':'blah'})
+        assert_sep005('Not SEP005 compliant')   # string
 
     with pytest.raises(TypeError):
         assert_sep005([[]]) # Channel should be dict, not list
