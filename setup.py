@@ -35,7 +35,6 @@ if __name__ == '__main__':
         author_email='wout.weijtjens@vub.be',
         maintainer='Wout Weijtjens',
         maintainer_email='wout.weijtjens@vub.be',
-        install_requires=requirements,
         keywords=['io', 'tdms', 'SEP5'],
         packages=['sdypy_sep005'],
         classifiers=['Development Status :: 3 - Alpha',
