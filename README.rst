@@ -4,6 +4,14 @@ SDyPy SEP005 Compliance
 This package servers to asses the compability with the SDyPy proposal
 for a unified timeseries model.
 
+Installation
+------------
+Available from pip: 
+
+.. code-block:: python
+
+    pip install sdypy-sep005
+
 Using the package
 ------------------
 
