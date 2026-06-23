@@ -1,20 +1,22 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 from datetime import datetime
+from typing import Optional
 
-PROHIBITED_FIELDS = ['timestamp']
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+PROHIBITED_FIELDS = ["timestamp"]
+
 
 class Sep005Data(BaseModel):  # pylint: disable=R0903
-    """SEP-005 compliant data structure model.
-    Per [SEP-005 specification](https://github.com/sdypy/sdypy/blob/main/docs/seps/sep-0005.rst):
-
-    ### Fields
+    """SEP-005 pydantinc model used to validate the data against the
+    SEP-005 guidelines.
     """
 
     # Compulsory fields per SEP-005
-    data: list[float | None] = Field(
+    data: list[Optional[float]] = Field(  # noqa: UP045
         ..., description="1D array of measurement values"
     )
-    
+
     name: str = Field(
         ..., description="Descriptive name of the timeseries/channel"
     )
@@ -25,35 +27,34 @@ class Sep005Data(BaseModel):  # pylint: disable=R0903
     )
 
     # Time information (at least one required per SEP-005)
-    time: list[float] | None = Field(
+    time: Optional[list[float]] = Field(  # noqa: UP045
         None, description="Time vector in seconds (optional if fs is provided)"
     )
-    fs: float | None = Field(
+    fs: Optional[float] = Field(  # noqa: UP045
         None,
         description="Sampling frequency in Hz (optional if time is provided)",
     )
 
     # Optional fields per SEP-005
-    quantity: str | None = Field(
+    quantity: Optional[str] = Field(  # noqa: UP045
         None,
         description=(
             "Physical quantity type - 'f' (force), 'a' (acceleration), 'v'"
             " (velocity), 'd' (displacement), 'e' (strain), 's' (stress)"
         ),
     )
-    unit_tex: str | None = Field(
+    unit_tex: Optional[str] = Field(  # noqa: UP045
         None, description="LaTeX representation of unit_str (e.g., 'm/s$^2$')"
     )
-    start_timestamp: str | None = Field(
+    start_timestamp: Optional[str] = Field(  # noqa: UP045
         None, description="ISO 8601 timestamp of first sample"
     )
-    end_timestamp: str | None = Field(
+    end_timestamp: Optional[str] = Field(  # noqa: UP045
         None, description="ISO 8601 timestamp of last sample"
     )
-    group: str | None = Field(
+    group: Optional[str] = Field(  # noqa: UP045
         None, description="Group of the timeseries/channel"
     )
-
 
     @model_validator(mode="after")
     def validate_sep005_compliance(self):
@@ -95,7 +96,7 @@ class Sep005Data(BaseModel):  # pylint: disable=R0903
         # Field names must match exactly (case-sensitive)
         # Prohibited field 'timestamp' is not allowed
         extra_keys = list((self.__pydantic_extra__ or {}).keys())
-        field_names = list(self.model_fields.keys())
+        field_names = list(type(self).model_fields.keys())
         for key in extra_keys:
             if key.lower() in [p_key.lower() for p_key in PROHIBITED_FIELDS]:
                 raise ValueError(
@@ -123,5 +124,5 @@ class Sep005Data(BaseModel):  # pylint: disable=R0903
                 "start_timestamp": "2025-08-16T01:00:00",
                 "end_timestamp": "2025-08-16T01:00:08",
             }
-        }
+        },
     )

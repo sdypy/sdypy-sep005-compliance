@@ -6,7 +6,7 @@ for a unified timeseries model.
 
 Installation
 ------------
-Available from pip: 
+Available from pip:
 
 .. code-block:: python
 
