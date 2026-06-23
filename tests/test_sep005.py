@@ -1,93 +1,97 @@
+from datetime import UTC, datetime
+
 import pytest
 import sdypy_sep005
+from pydantic import ValidationError
 
-import numpy as np
+from sdypy_sep005 import Sep005Data
 
-from datetime import datetime
 
-# Pytest will discover and run all test functions named `test_*` or `*_test`.
+def valid_channel(**overrides):
+    channel = {
+        "name": "test",
+        "unit_str": "m",
+        "data": [1, 2, 3],
+        "time": [1, 2, 3],
+    }
+    channel.update(overrides)
+    return channel
+
 
 def test_version():
-    """ check sdypy_template_project exposes a version attribute """
+    """Check sdypy_sep005 exposes a version attribute."""
     assert hasattr(sdypy_sep005, "__version__")
     assert isinstance(sdypy_sep005.__version__, str)
 
 
+def test_valid_channel():
+    channel = Sep005Data.model_validate(valid_channel())
+    assert channel.name == "test"
+    assert channel.data == [1, 2, 3]
+    assert channel.time == [1, 2, 3]
+
+
 def test_prohibited_keywords():
-    from sdypy_sep005.sep005 import check_prohibited_fields
+    with pytest.raises(ValidationError, match="'timestamp' is a Prohibited keyword"):
+        Sep005Data.model_validate(valid_channel(timestamp="2025-01-01T00:00:00"))
 
-    with pytest.raises(ValueError, match="'timestamp' is a Prohibited keyword"):
-        check_prohibited_fields(['timestamp'])
+    for bad_key in ("Unit_Str",):
+        with pytest.raises(
+            ValidationError,
+            match=f"'{bad_key}' is an invalid keyword",
+        ):
+            Sep005Data.model_validate(valid_channel(**{bad_key: "m"}))
 
-    for bad_key in ['Unit_Str']:
-        with pytest.raises(ValueError, match=f"'{bad_key}' is an invalid keyword"):
-            check_prohibited_fields([bad_key])
 
 def test_compulsory_keywords():
-    import copy
-    import random
+    with pytest.raises(ValidationError):
+        Sep005Data.model_validate({"name": "test", "unit_str": "m", "data": [1]})
 
-    from sdypy_sep005.sep005 import check_compulsory_fields
-    from sdypy_sep005.sep005 import COMPULSORY_FIELDS
-
-    # Shouldn't pass as time info is missing
-    with pytest.raises(ValueError):
-        check_compulsory_fields(COMPULSORY_FIELDS)
-
-    comp_list = copy.copy(COMPULSORY_FIELDS)
-    comp_list.append('fs')
-    check_compulsory_fields(comp_list) # Should pass
-
-    # Remove random element, shouldn't pass
-    random_element = random.choice(COMPULSORY_FIELDS)
-    comp_list.remove(random_element)
-    with pytest.raises(ValueError):
-        check_compulsory_fields(comp_list)
-
-def test_assert_sep005():
-    from sdypy_sep005.sep005 import assert_sep005
-
-    dummy_channels = [
-        {
-            'name' : 'test',
-            'unit_str': 'm',
-            'data': np.array([1,2,3]),
-            'time': np.array([1,2,3])
-        }
-    ]
-
-    assert_sep005(dummy_channels)
-
-    #
-    dummy_channels.append(
-        {
-            'name': 'test',
-            'unit_str': 'm',
-            'data': np.array([1, 2, 3]),
-            'time': np.array([1, 3])
-        }
+    Sep005Data.model_validate(
+        {"name": "test", "unit_str": "m", "data": [1], "fs": 100.0}
     )
 
-    with pytest.raises(ValueError, match= 'Length of the time vector and data vector do not match'):
-        assert_sep005(dummy_channels)
+    for field in ("data", "name", "unit_str"):
+        payload = valid_channel(fs=100.0)
+        del payload[field]
+        with pytest.raises(ValidationError):
+            Sep005Data.model_validate(payload)
 
-    # Type errors
-    with pytest.raises(TypeError):
-        assert_sep005('Not SEP005 compliant')   # string
 
-    with pytest.raises(TypeError):
-        assert_sep005([[]]) # Channel should be dict, not list
+def test_time_information_required():
+    with pytest.raises(ValidationError, match="Must provide either 'time' or 'fs'"):
+        Sep005Data.model_validate(
+            {"name": "test", "unit_str": "m", "data": [1, 2, 3]}
+        )
+
+
+def test_time_length_matches_data():
+    with pytest.raises(
+        ValidationError,
+        match="Length of time vector \\(2\\) must match data vector length \\(3\\)",
+    ):
+        Sep005Data.model_validate(valid_channel(time=[1, 3]))
+
+
+def test_invalid_input_type():
+    with pytest.raises(ValidationError):
+        Sep005Data.model_validate("Not SEP005 compliant")
+
 
 def test_timestamps():
-    from sdypy_sep005.sep005 import check_timestamp_iso8601
-
-    check_timestamp_iso8601(
-        {'start_timestamp':str(datetime.utcnow())}
+    Sep005Data.model_validate(
+        valid_channel(start_timestamp=str(datetime.now(UTC)))
     )
-    with pytest.raises(TypeError, match="end_timestamp"):
-        check_timestamp_iso8601(
-            {
-                'start_timestamp': str(datetime.utcnow()),
-                'end_timestamp': '2023/08/23 1200',
-             }
+
+    with pytest.raises(ValidationError, match="end_timestamp"):
+        Sep005Data.model_validate(
+            valid_channel(
+                start_timestamp=str(datetime.now(UTC)),
+                end_timestamp="2023/08/23 1200",
+            )
         )
+
+
+def test_unknown_extra_field_allowed():
+    channel = Sep005Data.model_validate(valid_channel(unknown_field="value"))
+    assert channel.__pydantic_extra__ == {"unknown_field": "value"}

@@ -15,15 +15,16 @@ Available from pip:
 Using the package
 ------------------
 
-The main function is the ``assert_sep005`` function that serves to
-validate whether a function return is compliant with the current guidelines.
+Validation is provided by the ``Sep005Data`` Pydantic model, which checks
+compliance with the current guidelines.
 
 
 It's main use case is for the unittests of a custom import wrapper
 
 .. code-block:: python
 
-    from sdypy_sep005.sep005 import assert_sep005
+    from sdypy_sep005 import Sep005Data
 
-    signals = read_from_path(FILE_PATH) # Your import wrapper
-    assert_sep005(signals)
+    signals = read_from_path(FILE_PATH)  # Your import wrapper
+    for channel in signals:
+        Sep005Data.model_validate(channel)
