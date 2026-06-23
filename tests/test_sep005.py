@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timezone
 
 import pytest
@@ -31,20 +32,43 @@ def test_valid_channel():
     assert channel.time == [1, 2, 3]
 
 
-def test_prohibited_keywords():
-    with pytest.raises(
-        ValidationError, match="'timestamp' is a Prohibited keyword"
-    ):
-        Sep005Data.model_validate(
-            valid_channel(timestamp="2025-01-01T00:00:00")
-        )
+def test_data_accepts_missing_samples():
+    data = [1, None, float("nan")]
+    channel = Sep005Data.model_validate(valid_channel(data=data))
+    assert channel.data[0] == 1
+    assert channel.data[1] is None
+    assert math.isnan(channel.data[2])
 
-    for bad_key in ("Unit_Str",):
-        with pytest.raises(
-            ValidationError,
-            match=f"'{bad_key}' is an invalid keyword",
-        ):
-            Sep005Data.model_validate(valid_channel(**{bad_key: "m"}))
+
+@pytest.mark.parametrize(
+    "bad_key,expected_key",
+    [
+        ("Data", "data"),
+        ("Name", "name"),
+        ("Unit_Str", "unit_str"),
+        ("Time", "time"),
+        ("Fs", "fs"),
+        ("Quantity", "quantity"),
+        ("Unit_Tex", "unit_tex"),
+        ("Start_Timestamp", "start_timestamp"),
+        ("End_Timestamp", "end_timestamp"),
+        ("Group", "group"),
+    ],
+)
+def test_field_names_are_case_sensitive(bad_key, expected_key):
+    with pytest.raises(
+        ValidationError,
+        match=f"'{bad_key}' is an invalid keyword, please use '{expected_key}'",
+    ):
+        Sep005Data.model_validate(valid_channel(**{bad_key: "extra"}))
+
+
+@pytest.mark.parametrize("bad_key", ["timestamp", "Timestamp", "TIMESTAMP"])
+def test_prohibited_keyword_is_case_insensitive(bad_key):
+    with pytest.raises(
+        ValidationError, match=f"'{bad_key}' is a Prohibited keyword"
+    ):
+        Sep005Data.model_validate(valid_channel(**{bad_key: "2025-01-01"}))
 
 
 def test_compulsory_keywords():
@@ -53,15 +77,17 @@ def test_compulsory_keywords():
             {"name": "test", "unit_str": "m", "data": [1]}
         )
 
-    Sep005Data.model_validate(
-        {"name": "test", "unit_str": "m", "data": [1], "fs": 100.0}
-    )
-
     for field in ("data", "name", "unit_str"):
         payload = valid_channel(fs=100.0)
         del payload[field]
         with pytest.raises(ValidationError):
             Sep005Data.model_validate(payload)
+
+
+def test_empty_time_and_data_vectors_are_valid():
+    channel = Sep005Data.model_validate(valid_channel(data=[], time=[]))
+    assert channel.data == []
+    assert channel.time == []
 
 
 def test_time_information_required():
@@ -82,25 +108,55 @@ def test_time_length_matches_data():
         Sep005Data.model_validate(valid_channel(time=[1, 3]))
 
 
-def test_invalid_input_type():
+def test_time_length_validation_allows_fs_without_time():
+    channel = Sep005Data.model_validate(valid_channel(time=None, fs=100.0))
+    assert channel.time is None
+    assert channel.fs == 100.0
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        "Not SEP005 compliant",
+        ["name", "unit_str", "data", "time"],
+        42,
+    ],
+)
+def test_invalid_input_types(payload):
     with pytest.raises(ValidationError):
-        Sep005Data.model_validate("Not SEP005 compliant")
+        Sep005Data.model_validate(payload)
 
 
-def test_timestamps():
-    Sep005Data.model_validate(
-        valid_channel(start_timestamp=str(datetime.now(timezone.utc)))  # noqa: UP017
-    )
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2025-08-16T01:00:00",
+        "2025-08-16T01:00:00+00:00",
+        "2025-08-16T01:00:00Z",
+        str(datetime.now(timezone.utc)),  # noqa: UP017
+    ],
+)
+def test_valid_timestamps(timestamp):
+    Sep005Data.model_validate(valid_channel(start_timestamp=timestamp))
 
-    with pytest.raises(ValidationError, match="end_timestamp"):
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["start_timestamp", "end_timestamp"],
+)
+def test_invalid_timestamps_report_field_name(field_name):
+    with pytest.raises(ValidationError, match=field_name):
         Sep005Data.model_validate(
-            valid_channel(
-                start_timestamp=str(datetime.now(timezone.utc)),  # noqa: UP017
-                end_timestamp="2023/08/23 1200",
-            )
+            valid_channel(**{field_name: "2023/08/23 1200"})
         )
 
 
-def test_unknown_extra_field_allowed():
-    channel = Sep005Data.model_validate(valid_channel(unknown_field="value"))
-    assert channel.__pydantic_extra__ == {"unknown_field": "value"}
+def test_unknown_extra_fields_allowed():
+    channel = Sep005Data.model_validate(
+        valid_channel(location="tower", sensor_id=42)
+    )
+    assert channel.__pydantic_extra__ == {
+        "location": "tower",
+        "sensor_id": 42,
+    }

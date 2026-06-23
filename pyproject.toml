@@ -93,7 +93,11 @@ dependencies =[
 ]
 # Modern Python: numpy/pandas come from project dependencies (pandas<3).
 [[tool.hatch.envs.hatch-test.matrix]]
-python = ["3.14","3.13", "3.12", "3.11", "3.10", "3.9"]
+python = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"]
+pydantic = ["1.*", "2.*"]
+
+[tool.hatch.envs.hatch-test.overrides.matrix.pydantic]
+dependencies = ["pydantic=={matrix:pydantic}"]
 
 # ** Pycln **
 # Pycln is a tool for removing unused imports and unused variables. It is
