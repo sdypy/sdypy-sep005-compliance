@@ -4,7 +4,7 @@
 [project]
 name = "sdypy_sep005"
 license = { file = "LICENSE" }
-readme = "README.rst"
+readme = "README.md"
 description = "Checks compability with the SDyPy SEP005 guidelines"
 dynamic = ["version"]
 classifiers=["Development Status :: 4 - Beta",
