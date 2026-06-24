@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -52,7 +52,7 @@ if PYDANTIC_V1:
         """
 
         # Compulsory fields per SEP-005
-        data: np.ndarray = Field(
+        data: Union[list[Optional[float]], np.ndarray] = Field(  # noqa: UP007
             ..., description="1D array of measurement values"
         )
 
@@ -114,17 +114,6 @@ if PYDANTIC_V1:
                     if key not in self.__fields__
                 }
             raise AttributeError(name)
-
-        @validator("data", pre=True)
-        def coerce_data_to_float64_array(
-            cls,  # noqa: N805
-            value: Any,
-        ) -> NDArray[np.float64]:
-            """Coerce measurement data to a 1D float64 NumPy array."""
-            data = np.asarray(value, dtype=np.float64)
-            if data.ndim != 1:
-                raise ValueError("data must be a 1D array")
-            return data
 
         @validator(*TIMESTAMP_FIELDS, pre=True)
         def coerce_timestamp_to_iso_string(
@@ -208,7 +197,7 @@ else:
         """
 
         # Compulsory fields per SEP-005
-        data: NDArray[np.float64] = Field(
+        data: Union[list[Optional[float]], NDArray[np.float64]] = Field(  # noqa: UP007
             ..., description="1D array of measurement values"
         )
 
@@ -255,18 +244,6 @@ else:
         group: Optional[str] = Field(  # noqa: UP045
             None, description="Group of the timeseries/channel"
         )
-
-        @field_validator("data", mode="before")
-        @classmethod
-        def coerce_data_to_float64_array(
-            cls,
-            value: Any,
-        ) -> NDArray[np.float64]:
-            """Coerce measurement data to a 1D float64 NumPy array."""
-            data = np.asarray(value, dtype=np.float64)
-            if data.ndim != 1:
-                raise ValueError("data must be a 1D array")
-            return data
 
         @field_validator(*TIMESTAMP_FIELDS, mode="before")
         @classmethod

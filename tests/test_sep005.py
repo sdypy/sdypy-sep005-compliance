@@ -29,24 +29,25 @@ def test_version():
 def test_valid_channel():
     channel = Sep005Data.model_validate(valid_channel())
     assert channel.name == "test"
-    np.testing.assert_array_equal(channel.data, np.array([1.0, 2.0, 3.0]))
-    assert channel.data.dtype == np.float64
+    assert channel.data == [1.0, 2.0, 3.0]
     assert channel.time == [1, 2, 3]
 
 
 def test_data_accepts_missing_samples():
-    data = [1, None, float("nan")]
-    channel = Sep005Data.model_validate(valid_channel(data=data))
-    assert channel.data[0] == 1
-    assert math.isnan(channel.data[1])
+    channel = Sep005Data.model_validate(
+        valid_channel(data=[1, None, float("nan")])
+    )
+    assert channel.data[0] == 1.0
+    assert channel.data[1] is None
     assert math.isnan(channel.data[2])
 
 
 def test_data_accepts_numpy_array():
     data = np.array([1, 2, 3], dtype=np.int64)
     channel = Sep005Data.model_validate(valid_channel(data=data))
-    np.testing.assert_array_equal(channel.data, np.array([1.0, 2.0, 3.0]))
-    assert channel.data.dtype == np.float64
+    assert isinstance(channel.data, np.ndarray)
+    np.testing.assert_array_equal(channel.data, data)
+    assert channel.data.dtype == np.int64
 
 
 @pytest.mark.parametrize(
@@ -93,9 +94,15 @@ def test_compulsory_keywords():
             Sep005Data.model_validate(payload)
 
 
+def test_data_accepts_list():
+    channel = Sep005Data.model_validate(valid_channel(data=[1, 2, 3]))
+    assert isinstance(channel.data, list)
+    assert channel.data == [1.0, 2.0, 3.0]
+
+
 def test_empty_time_and_data_vectors_are_valid():
     channel = Sep005Data.model_validate(valid_channel(data=[], time=[]))
-    np.testing.assert_array_equal(channel.data, np.array([], dtype=np.float64))
+    assert channel.data == []
     assert channel.time == []
 
 
