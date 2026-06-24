@@ -15,6 +15,33 @@ else:
     from pydantic import ConfigDict, field_validator, model_validator
 
 PROHIBITED_FIELDS = ["timestamp"]
+TIMESTAMP_FIELDS = ("start_timestamp", "end_timestamp")
+
+
+def coerce_sep005_timestamp(value: Any) -> Optional[str]:  # noqa: UP045
+    """Coerce a timestamp input to an ISO 8601 string.
+
+    Examples
+    --------
+    >>> from datetime import datetime, timezone
+    >>> coerce_sep005_timestamp(None) is None
+    True
+    >>> coerce_sep005_timestamp("2025-08-16T01:00:00")
+    '2025-08-16T01:00:00'
+    >>> coerce_sep005_timestamp(
+    ...     datetime(2025, 8, 16, 1, tzinfo=timezone.utc)
+    ... )
+    '2025-08-16T01:00:00+00:00'
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        return value
+    raise TypeError(
+        f"timestamp must be a string or datetime, got {type(value).__name__}"
+    )
 
 
 if PYDANTIC_V1:
@@ -99,6 +126,14 @@ if PYDANTIC_V1:
                 raise ValueError("data must be a 1D array")
             return data
 
+        @validator(*TIMESTAMP_FIELDS, pre=True)
+        def coerce_timestamp_to_iso_string(
+            cls,  # noqa: N805
+            value: Any,
+        ) -> Optional[str]:  # noqa: UP045
+            """Coerce timestamp fields to ISO 8601 strings."""
+            return coerce_sep005_timestamp(value)
+
         @root_validator(skip_on_failure=True)
         def validate_sep005_compliance(
             cls,  # noqa: N805
@@ -120,7 +155,7 @@ if PYDANTIC_V1:
                     "(SEP-005 requirement)"
                 )
 
-            for field_name in ["start_timestamp", "end_timestamp"]:
+            for field_name in TIMESTAMP_FIELDS:
                 timestamp = values.get(field_name)
                 if timestamp is not None:
                     try:
@@ -233,6 +268,15 @@ else:
                 raise ValueError("data must be a 1D array")
             return data
 
+        @field_validator(*TIMESTAMP_FIELDS, mode="before")
+        @classmethod
+        def coerce_timestamp_to_iso_string(
+            cls,
+            value: Any,
+        ) -> Optional[str]:  # noqa: UP045
+            """Coerce timestamp fields to ISO 8601 strings."""
+            return coerce_sep005_timestamp(value)
+
         @model_validator(mode="after")
         def validate_sep005_compliance(self) -> Any:
             """Validate complete SEP-005 compliance.
@@ -257,7 +301,7 @@ else:
                     "(SEP-005 requirement)"
                 )
 
-            for field_name in ["start_timestamp", "end_timestamp"]:
+            for field_name in TIMESTAMP_FIELDS:
                 timestamp = getattr(self, field_name, None)
                 if timestamp is not None:
                     try:

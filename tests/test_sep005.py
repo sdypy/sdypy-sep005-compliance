@@ -154,6 +154,18 @@ def test_valid_timestamps(timestamp):
     "field_name",
     ["start_timestamp", "end_timestamp"],
 )
+def test_timestamps_accept_datetime_objects(field_name):
+    timestamp = datetime(2023, 11, 15, 12, tzinfo=timezone.utc)  # noqa: UP017
+    channel = Sep005Data.model_validate(
+        valid_channel(**{field_name: timestamp})
+    )
+    assert getattr(channel, field_name) == timestamp.isoformat()
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    ["start_timestamp", "end_timestamp"],
+)
 def test_invalid_timestamps_report_field_name(field_name):
     with pytest.raises(ValidationError, match=field_name):
         Sep005Data.model_validate(
