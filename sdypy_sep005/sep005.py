@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Any, ClassVar, Optional
 
+import numpy as np
+from numpy.typing import NDArray
 from pydantic import BaseModel, Field
 from pydantic.version import VERSION
 
@@ -8,9 +10,9 @@ from pydantic.version import VERSION
 PYDANTIC_V1 = int(VERSION.split(".")[0]) < 2
 
 if PYDANTIC_V1:
-    from pydantic import root_validator
+    from pydantic import root_validator, validator
 else:
-    from pydantic import ConfigDict, model_validator
+    from pydantic import ConfigDict, field_validator, model_validator
 
 PROHIBITED_FIELDS = ["timestamp"]
 
@@ -23,7 +25,7 @@ if PYDANTIC_V1:
         """
 
         # Compulsory fields per SEP-005
-        data: list[Optional[float]] = Field(  # noqa: UP045
+        data: np.ndarray = Field(
             ..., description="1D array of measurement values"
         )
 
@@ -86,6 +88,17 @@ if PYDANTIC_V1:
                 }
             raise AttributeError(name)
 
+        @validator("data", pre=True)
+        def coerce_data_to_float64_array(
+            cls,  # noqa: N805
+            value: Any,
+        ) -> NDArray[np.float64]:
+            """Coerce measurement data to a 1D float64 NumPy array."""
+            data = np.asarray(value, dtype=np.float64)
+            if data.ndim != 1:
+                raise ValueError("data must be a 1D array")
+            return data
+
         @root_validator(skip_on_failure=True)
         def validate_sep005_compliance(
             cls,  # noqa: N805
@@ -138,6 +151,7 @@ if PYDANTIC_V1:
 
         class Config:
             extra = "allow"
+            arbitrary_types_allowed = True
             schema_extra: ClassVar[dict[str, Any]] = {
                 "example": {
                     "data": [1.5, 2.3, 1.8, 2.1, 1.9, 2.0, 1.7, 2.2],
@@ -159,7 +173,7 @@ else:
         """
 
         # Compulsory fields per SEP-005
-        data: list[Optional[float]] = Field(  # noqa: UP045
+        data: NDArray[np.float64] = Field(
             ..., description="1D array of measurement values"
         )
 
@@ -206,6 +220,18 @@ else:
         group: Optional[str] = Field(  # noqa: UP045
             None, description="Group of the timeseries/channel"
         )
+
+        @field_validator("data", mode="before")
+        @classmethod
+        def coerce_data_to_float64_array(
+            cls,
+            value: Any,
+        ) -> NDArray[np.float64]:
+            """Coerce measurement data to a 1D float64 NumPy array."""
+            data = np.asarray(value, dtype=np.float64)
+            if data.ndim != 1:
+                raise ValueError("data must be a 1D array")
+            return data
 
         @model_validator(mode="after")
         def validate_sep005_compliance(self) -> Any:
@@ -262,6 +288,7 @@ else:
 
         model_config = ConfigDict(
             extra="allow",
+            arbitrary_types_allowed=True,
             json_schema_extra={
                 "example": {
                     "data": [1.5, 2.3, 1.8, 2.1, 1.9, 2.0, 1.7, 2.2],

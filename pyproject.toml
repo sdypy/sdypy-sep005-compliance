@@ -29,6 +29,7 @@ maintainers = [{ name = "Pietro Dantuono", email = "pietro.dantuono@24sea.eu" },
 # -- Project dependencies.
 requires-python = ">=3.9.0,<3.15"
 dependencies = [
+    "numpy",
     "pydantic"
 ]
 
