@@ -1,0 +1,80 @@
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+  - pre-push
+
+default_stages:
+  - commit
+  - push
+
+exclude: ^notebooks/|LICENSE|DESCRIPTION|tasks|docs
+
+repos:
+-   repo: meta
+    hooks:
+    -   id: check-hooks-apply
+    -   id: check-useless-excludes
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.4.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+        args:
+        - --maxkb=10000
+    # -   id: check-json
+    # -   id: check-xml
+    -   id: check-case-conflict
+    -   id: check-merge-conflict
+-   repo: local
+    hooks:
+    -   id: pycln
+        name: pycln
+        entry: pycln
+        require_serial: true
+        language: system
+        files: "\\.(py)$"
+        args: [--config=pyproject.toml]
+    -   id: ruff-format
+        name: ruff-format
+        entry: ruff format
+        require_serial: true
+        language: system
+        types: [python]
+    -   id: commitizen
+        name: commitizen
+        entry: cz check
+        args: [--commit-msg-file]
+        require_serial: true
+        language: system
+        stages: [commit-msg]
+    -   id: ruff
+        name: ruff
+        entry: ruff check
+        args: ["--fix", "--extend-fixable=F401,F841,T201,T203,I001"]
+        require_serial: true
+        language: system
+        types: [python]
+    -   id: mypy
+        name: mypy
+        entry: mypy
+        require_serial: true
+        language: system
+        types: [python]
+        args: [--config-file=pyproject.toml]
+    -   id: jupytext
+        name: jupytext
+        entry: jupytext --sync --pipe black notebooks/* --to py:percent
+        language: system
+        always_run: true
+        pass_filenames: false
+    -   id: pytest
+        name: pytest
+        entry: pytest
+        require_serial: true
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+        always_run: true
+        types: [python]

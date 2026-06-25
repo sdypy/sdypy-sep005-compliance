@@ -1,92 +1,325 @@
-import numpy as np
-
 from datetime import datetime
+from typing import Any, ClassVar, Optional, Union
 
-COMPULSORY_FIELDS = ['data','name','unit_str']
-PROHIBITED_FIELDS = ['timestamp']
+import numpy as np
+from numpy.typing import NDArray
+from pydantic import BaseModel, Field
+from pydantic.version import VERSION
 
-def assert_sep005(timeseries):
+
+PYDANTIC_V1 = int(VERSION.split(".")[0]) < 2
+
+if PYDANTIC_V1:
+    from pydantic import root_validator, validator
+else:
+    from pydantic import ConfigDict, field_validator, model_validator
+
+PROHIBITED_FIELDS = ["timestamp"]
+TIMESTAMP_FIELDS = ("start_timestamp", "end_timestamp")
+
+
+def coerce_sep005_timestamp(value: Any) -> Optional[str]:  # noqa: UP045
+    """Coerce a timestamp input to an ISO 8601 string.
+
+    Examples
+    --------
+    >>> from datetime import datetime, timezone
+    >>> coerce_sep005_timestamp(None) is None
+    True
+    >>> coerce_sep005_timestamp("2025-08-16T01:00:00")
+    '2025-08-16T01:00:00'
+    >>> coerce_sep005_timestamp(
+    ...     datetime(2025, 8, 16, 1, tzinfo=timezone.utc)
+    ... )
+    '2025-08-16T01:00:00+00:00'
     """
-    Assert the compliance with the SEP005 guidelines as specified in
-    https://github.com/sdypy/sdypy/blob/main/docs/seps/sep-0005.rst
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str):
+        return value
+    raise TypeError(
+        f"timestamp must be a string or datetime, got {type(value).__name__}"
+    )
 
-    """
 
-    # Check datatype
-    if type(timeseries) != list and type(timeseries) != dict:
-        raise TypeError(f'Invalid datatype {type(timeseries)}, should be list or dict')
+if PYDANTIC_V1:
 
-    if type(timeseries) == dict:
-        timeseries = [timeseries]
+    class Sep005Data(BaseModel):  # pylint: disable=R0903
+        """SEP-005 pydantinc model used to validate the data against the
+        SEP-005 guidelines.
+        """
 
-    # Check the individual channels
-    for channel in timeseries:
-        assert_sep005_channel(channel)
+        # Compulsory fields per SEP-005
+        data: Union[list[Optional[float]], np.ndarray] = Field(  # noqa: UP007
+            ..., description="1D array of measurement values"
+        )
 
-def assert_sep005_channel(channel:dict):
-    """
-    Assert the compliance of the individual channels
-    """
+        name: str = Field(
+            ..., description="Descriptive name of the timeseries/channel"
+        )
+        unit_str: str = Field(
+            ...,
+            description="Physical unit of the measurement"
+            " (e.g., _m/s²_, _kN_, _°C_)",
+        )
 
-    if type(channel) != dict:
-        raise TypeError(f'Invalid datatype {type(channel)}, should be dict')
+        # Time information (at least one required per SEP-005)
+        time: Optional[list[float]] = Field(  # noqa: UP045
+            None,
+            description="Time vector in seconds (optional if fs is provided)",
+        )
+        fs: Optional[float] = Field(  # noqa: UP045
+            None,
+            description=(
+                "Sampling frequency in Hz (optional if time is provided)"
+            ),
+        )
 
-    keys = list(channel.keys())
+        # Optional fields per SEP-005
+        quantity: Optional[str] = Field(  # noqa: UP045
+            None,
+            description=(
+                "Physical quantity type - 'f' (force), 'a' (acceleration),"
+                " 'v' (velocity), 'd' (displacement), 'e' (strain), 's'"
+                " (stress)"
+            ),
+        )
+        unit_tex: Optional[str] = Field(  # noqa: UP045
+            None,
+            description="LaTeX representation of unit_str (e.g., 'm/s$^2$')",
+        )
+        start_timestamp: Optional[str] = Field(  # noqa: UP045
+            None, description="ISO 8601 timestamp of first sample"
+        )
+        end_timestamp: Optional[str] = Field(  # noqa: UP045
+            None, description="ISO 8601 timestamp of last sample"
+        )
+        group: Optional[str] = Field(  # noqa: UP045
+            None, description="Group of the timeseries/channel"
+        )
 
-    check_prohibited_fields(keys)
-    check_compulsory_fields(keys)
+        @classmethod
+        def model_validate(cls, obj: Any, **_: Any) -> Any:
+            """Validate data with the Pydantic v2-compatible API name."""
+            return cls.parse_obj(obj)
 
-    if 'time' in keys:
-        if len(channel['time']) != len(channel['data']):
-            raise ValueError(
-                f"Length of the time vector and data vector do not match :"
-                f" {len(channel['time'])} vs. {len(channel['data'])}")
+        def __getattr__(self, name: str) -> Any:
+            """Expose selected Pydantic v2 attributes on Pydantic v1."""
+            if name == "__pydantic_extra__":
+                return {
+                    key: value
+                    for key, value in self.__dict__.items()
+                    if key not in self.__fields__
+                }
+            raise AttributeError(name)
 
-    check_timestamp_iso8601(channel)
+        @validator(*TIMESTAMP_FIELDS, pre=True)
+        def coerce_timestamp_to_iso_string(
+            cls,  # noqa: N805
+            value: Any,
+        ) -> Optional[str]:  # noqa: UP045
+            """Coerce timestamp fields to ISO 8601 strings."""
+            return coerce_sep005_timestamp(value)
 
-    if type(channel['data']) != np.ndarray:
-        raise TypeError(f"Invalid datatype {type(channel['data'])}, should be np.array")
+        @root_validator(skip_on_failure=True)
+        def validate_sep005_compliance(
+            cls,  # noqa: N805
+            values: dict[str, Any],
+        ) -> dict[str, Any]:
+            """Validate complete SEP-005 compliance."""
+            if values.get("time") is None and values.get("fs") is None:
+                raise ValueError(
+                    "Must provide either 'time' or 'fs' to replicate time "
+                    "information (SEP-005 requirement)"
+                )
 
-def check_compulsory_fields(keywords:list):
-    """
-    Check that all the compulsory fields are present
-    """
+            data = values.get("data")
+            time = values.get("time")
+            if time is not None and data is not None and len(time) != len(data):
+                raise ValueError(
+                    f"Length of time vector ({len(time)}) must match "
+                    f"data vector length ({len(data)}) "
+                    "(SEP-005 requirement)"
+                )
 
-    for c_key in COMPULSORY_FIELDS:
-        if c_key not in keywords:
-            raise ValueError(f"Missing compulsory keyword '{c_key}'")
+            for field_name in TIMESTAMP_FIELDS:
+                timestamp = values.get(field_name)
+                if timestamp is not None:
+                    try:
+                        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    except ValueError as e:
+                        raise ValueError(
+                            f"{field_name} '{timestamp}' is not valid ISO "
+                            "8601 format (SEP-005 requirement)"
+                        ) from e
 
-    if 'time' not in keywords and 'fs' not in keywords:
-        raise ValueError(f"Missing information to replicate time")
+            field_names = list(cls.__fields__.keys())
+            extra_keys = [key for key in values if key not in cls.__fields__]
+            for key in extra_keys:
+                if key.lower() in [
+                    p_key.lower() for p_key in PROHIBITED_FIELDS
+                ]:
+                    raise ValueError(
+                        f"'{key}' is a Prohibited keyword, do not use it."
+                    )
+                for field_name in field_names:
+                    if key.lower() == field_name.lower() and key != field_name:
+                        raise ValueError(
+                            f"'{key}' is an invalid keyword, "
+                            f"please use '{field_name}' instead."
+                        )
 
-def check_prohibited_fields(keywords:list):
-    """
-    Checks that none of the prohibited fields are included in the channels keywords
+            return values
 
-    - Check errors in case in the compulsory fields
-    - Check if none of the fields are in the forbidden field list
-    """
+        class Config:
+            extra = "allow"
+            arbitrary_types_allowed = True
+            schema_extra: ClassVar[dict[str, Any]] = {
+                "example": {
+                    "data": [1.5, 2.3, 1.8, 2.1, 1.9, 2.0, 1.7, 2.2],
+                    "name": "Wind turbine tower acceleration",
+                    "unit_str": "m/s²",
+                    "fs": 100.0,
+                    "quantity": "a",
+                    "unit_tex": "m/s$^2$",
+                    "start_timestamp": "2025-08-16T01:00:00",
+                    "end_timestamp": "2025-08-16T01:00:08",
+                }
+            }
 
-    for key in keywords:
-        if key.lower() in [c_key.lower() for c_key in COMPULSORY_FIELDS] and (key not in COMPULSORY_FIELDS):
-            for c_key in COMPULSORY_FIELDS:
-                if key.lower() == c_key:
-                    raise ValueError(f"'{key}' is an invalid keyword, please use '{c_key}' instead.")
+else:
 
-    for key in keywords:
-        if key.lower() in [p_key.lower() for p_key in PROHIBITED_FIELDS]:
-            raise ValueError(f"'{key}' is a Prohibited keyword, do not use it.")
+    class Sep005Data(BaseModel):  # type: ignore
+        """SEP-005 pydantinc model used to validate the data against the
+        SEP-005 guidelines.
+        """
 
-def check_timestamp_iso8601(channel):
-    """
-    Check that any timestamp provided is in ISO8601
-    """
-    keys = list(channel.keys())
+        # Compulsory fields per SEP-005
+        data: Union[list[Optional[float]], NDArray[np.float64]] = Field(  # noqa: UP007
+            ..., description="1D array of measurement values"
+        )
 
-    for key in keys:
-        if 'timestamp' in key:
-            dt_str = channel[key]
-            try:
-                datetime.fromisoformat(dt_str)
-            except:
-                raise TypeError(f"Timestamp '{key}':{dt_str} is not according to ISO8601")
+        name: str = Field(
+            ..., description="Descriptive name of the timeseries/channel"
+        )
+        unit_str: str = Field(
+            ...,
+            description="Physical unit of the measurement"
+            " (e.g., _m/s²_, _kN_, _°C_)",
+        )
+
+        # Time information (at least one required per SEP-005)
+        time: Optional[list[float]] = Field(  # noqa: UP045
+            None,
+            description="Time vector in seconds (optional if fs is provided)",
+        )
+        fs: Optional[float] = Field(  # noqa: UP045
+            None,
+            description=(
+                "Sampling frequency in Hz (optional if time is provided)"
+            ),
+        )
+
+        # Optional fields per SEP-005
+        quantity: Optional[str] = Field(  # noqa: UP045
+            None,
+            description=(
+                "Physical quantity type - 'f' (force), 'a' (acceleration),"
+                " 'v' (velocity), 'd' (displacement), 'e' (strain), 's'"
+                " (stress)"
+            ),
+        )
+        unit_tex: Optional[str] = Field(  # noqa: UP045
+            None,
+            description="LaTeX representation of unit_str (e.g., 'm/s$^2$')",
+        )
+        start_timestamp: Optional[str] = Field(  # noqa: UP045
+            None, description="ISO 8601 timestamp of first sample"
+        )
+        end_timestamp: Optional[str] = Field(  # noqa: UP045
+            None, description="ISO 8601 timestamp of last sample"
+        )
+        group: Optional[str] = Field(  # noqa: UP045
+            None, description="Group of the timeseries/channel"
+        )
+
+        @field_validator(*TIMESTAMP_FIELDS, mode="before")
+        @classmethod
+        def coerce_timestamp_to_iso_string(
+            cls,
+            value: Any,
+        ) -> Optional[str]:  # noqa: UP045
+            """Coerce timestamp fields to ISO 8601 strings."""
+            return coerce_sep005_timestamp(value)
+
+        @model_validator(mode="after")
+        def validate_sep005_compliance(self) -> Any:
+            """Validate complete SEP-005 compliance.
+
+            Checks:
+            1. Either 'time' or 'fs' must be provided
+            2. If 'time' is provided, length must match 'data' length
+            3. All *_timestamp fields must be valid ISO 8601 format
+            4. Field names must match exactly (case-sensitive)
+            5. Prohibited field 'timestamp' is not allowed
+            """
+            if self.time is None and self.fs is None:
+                raise ValueError(
+                    "Must provide either 'time' or 'fs' to replicate time "
+                    "information (SEP-005 requirement)"
+                )
+
+            if self.time is not None and len(self.time) != len(self.data):
+                raise ValueError(
+                    f"Length of time vector ({len(self.time)}) must match "
+                    f"data vector length ({len(self.data)}) "
+                    "(SEP-005 requirement)"
+                )
+
+            for field_name in TIMESTAMP_FIELDS:
+                timestamp = getattr(self, field_name, None)
+                if timestamp is not None:
+                    try:
+                        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    except ValueError as e:
+                        raise ValueError(
+                            f"{field_name} '{timestamp}' is not valid ISO "
+                            "8601 format (SEP-005 requirement)"
+                        ) from e
+
+            extra_keys = list((self.__pydantic_extra__ or {}).keys())
+            field_names = list(type(self).model_fields.keys())
+            for key in extra_keys:
+                if key.lower() in [
+                    p_key.lower() for p_key in PROHIBITED_FIELDS
+                ]:
+                    raise ValueError(
+                        f"'{key}' is a Prohibited keyword, do not use it."
+                    )
+                for field_name in field_names:
+                    if key.lower() == field_name.lower() and key != field_name:
+                        raise ValueError(
+                            f"'{key}' is an invalid keyword, "
+                            f"please use '{field_name}' instead."
+                        )
+
+            return self
+
+        model_config = ConfigDict(
+            extra="allow",
+            arbitrary_types_allowed=True,
+            json_schema_extra={
+                "example": {
+                    "data": [1.5, 2.3, 1.8, 2.1, 1.9, 2.0, 1.7, 2.2],
+                    "name": "Wind turbine tower acceleration",
+                    "unit_str": "m/s²",
+                    "fs": 100.0,
+                    "quantity": "a",
+                    "unit_tex": "m/s$^2$",
+                    "start_timestamp": "2025-08-16T01:00:00",
+                    "end_timestamp": "2025-08-16T01:00:08",
+                }
+            },
+        )
