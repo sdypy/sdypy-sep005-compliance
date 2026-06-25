@@ -52,7 +52,7 @@ if PYDANTIC_V1:
         """
 
         # Compulsory fields per SEP-005
-        data: Union[list[float | None], np.ndarray] = Field(  # noqa: UP007
+        data: Union[list[Optional[float]], np.ndarray] = Field(  # noqa: UP007, UP045
             ..., description="1D array of measurement values"
         )
 
@@ -197,7 +197,7 @@ else:
         """
 
         # Compulsory fields per SEP-005
-        data: Union[list[float | None], NDArray[np.float64]] = Field(  # noqa: UP007
+        data: Union[list[Optional[float]], NDArray[np.float64]] = Field(  # noqa: UP007, UP045
             ..., description="1D array of measurement values"
         )
 
