@@ -52,7 +52,7 @@ if PYDANTIC_V1:
         """
 
         # Compulsory fields per SEP-005
-        data: Union[list[Optional[float]], np.ndarray] = Field(  # noqa: UP007
+        data: Union[list[Optional[float]], np.ndarray] = Field(  # noqa: UP007, UP045
             ..., description="1D array of measurement values"
         )
 
@@ -197,7 +197,7 @@ else:
         """
 
         # Compulsory fields per SEP-005
-        data: Union[list[Optional[float]], NDArray[np.float64]] = Field(  # noqa: UP007
+        data: Union[list[Optional[float]], NDArray[np.float64]] = Field(  # noqa: UP007, UP045
             ..., description="1D array of measurement values"
         )
 
@@ -323,3 +323,14 @@ else:
                 }
             },
         )
+
+
+def assert_sep005_channel(channel: dict[str, Any]):
+    """Assert a channel is valid SEP-005 compliant."""
+    Sep005Data.model_validate(channel)
+
+
+def assert_sep005(timeseries: list[dict[str, Any]]):
+    """Assert a list of channels is valid SEP-005 compliant."""
+    for channel in timeseries:
+        assert_sep005_channel(channel)
