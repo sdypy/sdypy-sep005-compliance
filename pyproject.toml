@@ -1,0 +1,255 @@
+# // Title: pyproject.toml
+# // Description: This file contains the configuration for the project.
+# -- Project metadata.
+[project]
+name = "sdypy_sep005"
+license = { file = "LICENSE" }
+readme = "README.md"
+description = "Checks compability with the SDyPy SEP005 guidelines"
+dynamic = ["version"]
+classifiers=["Development Status :: 4 - Beta",
+             "Environment :: Console",
+             "Intended Audience :: Science/Research",
+             "Intended Audience :: Information Technology",
+             "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+             "Natural Language :: English",
+             "Operating System :: POSIX :: Linux",
+             "Programming Language :: Python :: 3",
+             "Programming Language :: Python :: 3.9",
+             "Programming Language :: Python :: 3.10",
+             "Programming Language :: Python :: 3.11",
+             "Programming Language :: Python :: 3.12",
+             "Programming Language :: Python :: 3.13",
+             "Programming Language :: Python :: 3.14"
+             ]
+authors = [{ name = "Wout Weijtjens", email = "wout.weijtjens@24sea.eu" }]
+maintainers = [{ name = "Pietro Dantuono", email = "pietro.dantuono@24sea.eu" },
+               { name = "Wout Weijtjens", email = "wout.weijtjens@24sea.eu" },
+               { name = "Panagiotis Konis", email = "panagiotis.konis@24sea.eu" }]
+# -- Project dependencies.
+requires-python = ">=3.9.0,<3.15"
+dependencies = [
+    "numpy",
+    "pydantic"
+]
+
+# -- Project package.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[tool.hatch.build.targets.wheel]
+packages = ["sdypy_sep005"]
+
+[tool.hatch.version]
+path = "./sdypy_sep005/__init__.py"
+pattern = "__version__: str = \"(?P<version>[^\"]+)\""
+
+# -- Project URLs
+[project.urls]
+"Homepage" = "https://github.com/sdypy"
+Repository = "https://github.com/OWI-Lab/sdypy-sep005-compliance"
+
+# -- Project optional dependencies
+# [project.optional-dependencies]
+# optional_group_name = ["dependency_1", "dependency_2"]
+
+# -- Project dependency groups
+[dependency-groups]
+docs = ["sphinx", "sphinx-rtd-theme"]
+nb = ["notebook<7.0", "python-dotenv", "psycopg>=3.2.4", "tabulate>=0.9.0",
+      "matplotlib>=3.7.1"]
+ci = ["mypy==1.*", "pycln==2.4.*","black",
+      "ruff==0.*", "commitizen==3.*", "pre-commit==3.*",
+      "types-PyYAML", "types-pytz", "types-requests", "jupytext",
+      "invoke==2.2.*"]
+test = ["pytest==8.3.2", "pytest-mock==3.14.0", "hypothesis==6.111.2",
+        "pytest-cov==5.0.0", "pytest-randomly==3.15.0", "types-python-dateutil",
+        "hatch==1.*"]
+build = ["twine==5.1.1", "build==1.2.1"]
+all = [{include-group = "docs"}, {include-group = "nb"}, {include-group = "ci"},
+       {include-group = "test"}, {include-group = "build"}]
+
+# -- Project tools
+# ** uv **
+# uv is a tool for managing virtual environments. It is configured to use the
+# same list of ignored directories as Ruff, and to exclude a variety of
+# commonly ignored directories from being managed.
+[tool.uv]
+package = true
+default-groups = ["ci", "test"]
+[tool.hatch.envs.default]
+installer = "uv"
+# ** Hatch **
+[tool.hatch.envs.hatch-test]
+dependencies =[
+    "coverage-enable-subprocess==1.0",
+    "coverage[toml]<7.11; python_version < '3.10'",
+    "coverage[toml]~=7.11; python_version >= '3.10'",
+    "pytest~=8.1",
+    "pytest-mock~=3.12",
+    "pytest-randomly~=3.15",
+    "pytest-rerunfailures~=14.0",
+    "pytest-xdist[psutil]~=3.5",
+    "hypothesis~=6.111.2",
+]
+# Modern Python: numpy/pandas come from project dependencies (pandas<3).
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"]
+pydantic = ["1.*", "2.*"]
+
+[tool.hatch.envs.hatch-test.overrides.matrix.pydantic]
+dependencies = ["pydantic=={matrix:pydantic}"]
+
+# ** Pycln **
+# Pycln is a tool for removing unused imports and unused variables. It is
+# configured to remove unused imports and unused variables, and to remove
+# unused variables from the global scope.
+[tool.pycln]
+all = true
+exclude = ["__init__.py", "conftest.py", "*.notebooks.*", "*.docs.*",
+           "*.database.*", "*.docker.*", "*.__frontend.*", "*.templates.*",
+           "*.static.*", "*.staticfiles.*", "*.sql.*", "*.migrations.*"]
+
+# ** Ruff **
+# Ruff is a tool for linting Python code. It is configured to use the same
+# line length as Black, 80 characters, and to ignore a variety of commonly
+# ignored directories.
+[tool.ruff]
+line-length = 80
+indent-width = 4
+target-version = "py312"
+# -- Exclude a variety of commonly ignored directories.
+exclude = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg",
+           ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache",
+           ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out",
+           "build", "dist", "node_modules", "venv", "api", "docs", "notebooks",
+           "scripts", "test", "config", "docker", "logs", "tasks"] # -- Allow unused variables when underscore-prefixed.
+# -- Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
+
+
+[tool.ruff.lint]
+# Select rule categories to enable
+select = [
+    "ARG", # Unused arguments
+    "I",   # isort
+    "E",   # pycodestyle errors
+    "RUF", # ruff errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "N",   # pep8-naming
+    "PLE",  # pylint errors
+    "PTH", # Prefer pathlib
+    "C90",
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+
+# Disable specific rules (equivalent to pylint disable)
+ignore = [
+    "E402",  # module-level-import-not-at-top-of-file
+    "UP009",  # Unnecessary utf-8 encoding comment
+    "UP015",  # Unnecessary mode argument
+    "PTH123"  # Path.open instead of open
+]
+
+[tool.ruff.lint.flake8-annotations]
+# If you want to enforce type annotations, configure here
+# suppress-dummy-args = true
+
+[tool.ruff.lint.pylint]
+max-args = 15
+max-locals = 25
+max-positional-args = 10
+
+[tool.ruff.lint.isort]
+# Configure import sorting (replaces wrong-import-order check)
+force-single-line = false
+lines-after-imports = 2
+
+# [tool.ruff.lint.flake8-fixme]
+# Enable detection of TODO, FIXME, XXX, NOTE comments
+# (equivalent to pylint notes)
+
+# ** Ruff: McCabe **
+# McCabe is a tool for measuring cyclomatic complexity. It is configured to
+# use a complexity level of 15. The complexity level is the amount of
+# different paths through a function, for example, a function with a single
+# if statement has a complexity level of 2.
+[tool.ruff.lint.mccabe]
+# -- Unlike Flake8, default to a complexity level of 15.
+max-complexity = 15
+
+# ** Mypy **
+# Mypy is a tool for type checking Python code. It is configured to use
+# Python 3.8, to disallow untyped definitions, to show error codes, to
+# disallow implicit optionals, to warn on any return type, to warn on unused
+# ignores, and to exclude a variety of commonly ignored directories from being
+# type checked.
+[tool.mypy]
+python_version = "3.12"
+disallow_untyped_defs = false
+show_error_codes = true
+no_implicit_optional = true
+warn_return_any = true
+warn_unused_ignores = false
+follow_imports = "skip"
+strict_optional = true
+check_untyped_defs = true
+exclude = ["*.notebooks.*", "*.docs.*", "*.database.*", "*.docker.*",
+           "*.__frontend.*", "*.templates.*", "*.static.*", "*.staticfiles.*",
+           "*.sql.*", "*.migrations.*", "*.tests.*"]
+ignore_missing_imports = true
+ignore_errors = false
+[tool.mypy-yaml]
+ignore_missing_imports = true
+[tool.mypy-tests]
+follow_imports = false
+# ** Jupytext **
+# Jupytext is a tool for converting Jupyter Notebooks to Python scripts. It is
+# configured to use the same list of ignored directories as Ruff, and to exclude
+# a variety of commonly ignored directories from being converted.
+[tool.jupytext.formats]
+"notebooks/" = "ipynb"
+# "scripts/" = "py:percent"
+
+# ** Pytest **
+# Pytest is a tool for testing Python code. It is configured to use the same
+# list of ignored directories as Ruff, and to exclude a variety of commonly
+# ignored directories from being tested.
+[tool.pytest.ini_options]
+norecursedirs = [".bzr", ".direnv", ".eggs", ".git", ".git-rewrite", ".hg",
+                 ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache",
+                 ".svn", ".tox", ".venv", "__pypackages__", "_build",
+                 "buck-out", "build", "dist", "node_modules", "venv", "api",
+                 "docs", "notebooks", "scripts", "test", "config", "docker",
+                 "logs"]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "test",
+    "tests",
+]
+
+# ** Commitizen **
+# Commitizen is a tool for creating commit messages. It is configured to use
+# the cz_conventional_commits adapter, to use the same list of ignored
+# directories as Ruff, and to exclude a variety of commonly ignored
+# directories from being committed.
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "3.13.0"
+bump_message = "bump(version): {current_version} → {new_version}"
+update_changelog_on_bump = true
+style = [
+    ["qmark", "fg:#ff9d00 bold"],
+    ["question", "bold"],
+    ["answer", "fg:#ff9d00 bold"],
+    ["pointer", "fg:#ff9d00 bold"],
+    ["highlighted", "fg:#ff9d00 bold"],
+    ["selected", "fg:#cc5454"],
+    ["separator", "fg:#cc5454"],
+    ["instruction", ""],
+    ["text", ""],
+    ["disabled", "fg:#858585 italic"]
+]

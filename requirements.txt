@@ -1,2 +1,0 @@
-# Package requirements for users
-numpy>=1.11.0
