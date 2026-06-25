@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 import sdypy_sep005
 from sdypy_sep005 import Sep005Data
+from sdypy_sep005.sep005 import assert_sep005, assert_sep005_channel
 
 
 def valid_channel(**overrides):
@@ -188,3 +189,23 @@ def test_unknown_extra_fields_allowed():
         "location": "tower",
         "sensor_id": 42,
     }
+
+
+def test_assert_sep005_channel_accepts_valid_dict():
+    assert_sep005_channel(valid_channel())
+
+
+def test_assert_sep005_channel_rejects_invalid_dict():
+    with pytest.raises(ValidationError):
+        assert_sep005_channel({"name": "test", "unit_str": "m", "data": [1]})
+
+
+def test_assert_sep005_accepts_valid_timeseries():
+    assert_sep005([valid_channel(), valid_channel(name="other")])
+
+
+def test_assert_sep005_rejects_invalid_timeseries():
+    with pytest.raises(ValidationError):
+        assert_sep005(
+            [valid_channel(), {"name": "bad", "unit_str": "m", "data": [1]}]
+        )
